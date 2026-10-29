@@ -1,0 +1,14 @@
+{
+  "name": "edufund-dapp",
+  "version": "1.0.0",
+  "description": "Decentralized Milestone-Based Crowdfunding Platform for Educational Projects",
+  "main": "js/app.js",
+  "scripts": {
+    "start": "node server.js",
+    "compile": "node scripts/compile.js",
+    "deploy": "node scripts/deploy.js"
+  },
+  "keywords": ["web3", "dapp", "ethereum", "solidity", "sepolia", "crowdfunding"],
+  "author": "EduFund Team",
+  "license": "MIT"
+}

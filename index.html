@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduFund | Decentralized Milestone Crowdfunding</title>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            surface: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Ethers.js v6 UMD CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="bg-surface-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- File Protocol Warning Banner (Auto-shown on file:// URLs) -->
+  <div id="fileProtocolBanner" class="hidden bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 text-xs text-amber-200">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+        <span>
+          <strong>MetaMask Notice:</strong> Chrome blocks wallet extensions on <code class="bg-amber-900/40 px-1 py-0.5 rounded text-amber-300 font-mono">file://</code> URLs by default.
+        </span>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="app.openTroubleshootModal()" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold underline transition">
+          Fix MetaMask Access
+        </button>
+        <button onclick="window.web3Handler.enableSimulatedWallet()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition">
+          Use Demo Wallet
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ambient Glow Effects -->
+  <div class="fixed top-0 left-1/4 w-96 h-96 bg-brand-600/15 rounded-full blur-3xl pointer-events-none -z-10"></div>
+  <div class="fixed top-1/3 right-10 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+  <div class="fixed bottom-10 left-1/3 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 glassmorphism">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        
+        <!-- Logo & Brand -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="app.setFilter('all')">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-brand-500/25">
+            <i data-lucide="graduation-cap" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-2xl font-extrabold tracking-tight text-white">Edu<span class="gradient-text">Fund</span></span>
+              <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-full">dApp</span>
+            </div>
+            <p class="text-xs text-slate-400 hidden sm:block">Milestone-Verified Web3 Crowdfunding</p>
+          </div>
+        </div>
+
+        <!-- Center Actions / Quick Badges -->
+        <div class="hidden md:flex items-center space-x-2">
+          <!-- Network Status Badge -->
+          <div id="networkPill" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800/90 border border-slate-700/80 text-xs">
+            <span id="networkStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span id="networkStatusText" class="text-slate-300 font-medium">Sepolia Testnet</span>
+            <button id="switchNetworkBtn" class="hidden text-brand-400 hover:text-brand-300 font-semibold ml-1 underline">Switch</button>
+          </div>
+
+          <!-- Sepolia Faucet Link -->
+          <a href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia" target="_blank" rel="noopener noreferrer" 
+             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 text-xs text-slate-300 hover:text-white transition">
+            <i data-lucide="droplet" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span>Get Sepolia ETH</span>
+          </a>
+        </div>
+
+        <!-- Right Side Wallet & Actions -->
+        <div class="flex items-center space-x-3">
+          <!-- Settings / Contract Config Button -->
+          <button id="openConfigModalBtn" title="Contract & Network Settings" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 transition">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </button>
+
+          <!-- Launch Campaign Button -->
+          <button id="openCreateModalBtn" class="hidden sm:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-semibold text-sm shadow-md shadow-brand-500/20 transition active:scale-95">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>Create Campaign</span>
+          </button>
+
+          <!-- Wallet Connect Area -->
+          <div id="walletArea">
+            <button id="connectWalletBtn" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-semibold text-sm transition active:scale-95">
+              <i data-lucide="wallet" class="w-4 h-4 text-brand-400"></i>
+              <span>Connect Wallet</span>
+            </button>
+
+            <!-- Connected User Badge (Hidden initially) -->
+            <div id="connectedUserDropdown" class="hidden relative">
+              <button id="userMenuBtn" class="flex items-center space-x-2.5 px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700 text-sm transition">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulse-indicator"></span>
+                <div class="text-left">
+                  <div id="userAddressLabel" class="font-mono text-xs font-semibold text-slate-200">0x...</div>
+                  <div class="text-[11px] text-brand-300 font-medium"><span id="userBalanceLabel">0.00</span> ETH</div>
+                </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 ml-1"></i>
+              </button>
+
+              <!-- Dropdown Menu -->
+              <div id="userMenuDropdown" class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50">
+                <div class="px-4 py-2 border-b border-slate-800">
+                  <p class="text-xs text-slate-400">Connected to</p>
+                  <p class="text-xs font-semibold text-slate-200" id="userMenuNetwork">Sepolia Testnet</p>
+                </div>
+                <button onclick="app.setFilter('my-campaigns')" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2">
+                  <i data-lucide="folder-git-2" class="w-4 h-4 text-slate-400"></i>
+                  <span>My Created Projects</span>
+                </button>
+                <button onclick="app.setFilter('backed')" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2">
+                  <i data-lucide="heart" class="w-4 h-4 text-pink-400"></i>
+                  <span>Backed Projects</span>
+                </button>
+                <button id="disconnectWalletBtn" class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-800 flex items-center space-x-2">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Floating Create Button -->
+  <button onclick="app.openCreateModal()" class="sm:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-gradient-to-r from-brand-600 to-purple-600 text-white flex items-center justify-center shadow-2xl shadow-brand-500/50">
+    <i data-lucide="plus" class="w-6 h-6"></i>
+  </button>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+    <!-- Hero / Headline Section -->
+    <section class="relative rounded-3xl p-8 sm:p-12 overflow-hidden border border-slate-800/80 bg-gradient-to-b from-slate-900/90 via-surface-900/60 to-slate-950/90 shadow-2xl">
+      <div class="relative z-10 max-w-3xl space-y-4">
+        <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+          <span>Milestone-Protected Crypto Pledges & Full Refund Guarantee</span>
+        </div>
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          Fund the Next Generation of <span class="gradient-text">Education & Impact</span>
+        </h1>
+        <p class="text-base sm:text-lg text-slate-300 leading-relaxed">
+          Back verified open-source, STEM, and educational breakthroughs on the Ethereum Sepolia testnet. Creators only unlock pledged funds as predefined milestones are approved by backer consensus.
+        </p>
+
+        <!-- Hero Action Buttons -->
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <button onclick="app.openCreateModal()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-brand-500/30 transition">
+            Launch Your Campaign
+          </button>
+          <button onclick="app.scrollToCampaigns()" class="px-6 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm transition">
+            Explore Campaigns
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Platform Stats -->
+      <div class="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-4 mt-10 pt-8 border-t border-slate-800/80">
+        <div class="space-y-1">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white font-mono" id="statTotalRaised">0.00 ETH</div>
+          <p class="text-xs text-slate-400">Total Value Pledged</p>
+        </div>
+        <div class="space-y-1">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white font-mono" id="statActiveCampaigns">0</div>
+          <p class="text-xs text-slate-400">Active Campaigns</p>
+        </div>
+        <div class="space-y-1">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white font-mono" id="statMilestonesApproved">0</div>
+          <p class="text-xs text-slate-400">Milestones Verified</p>
+        </div>
+        <div class="space-y-1">
+          <div class="text-2xl sm:text-3xl font-extrabold text-white font-mono" id="statTotalBackers">0</div>
+          <p class="text-xs text-slate-400">Community Backers</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filter & Search Control Toolbar -->
+    <section id="campaignsSection" class="space-y-6">
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        
+        <!-- Filter Tabs -->
+        <div class="flex flex-wrap items-center gap-2 p-1 bg-slate-900/80 rounded-2xl border border-slate-800">
+          <button onclick="app.setFilter('all')" id="filterTab-all" class="filter-tab px-4 py-2 text-xs font-semibold rounded-xl transition bg-brand-600 text-white shadow-sm">
+            All Campaigns
+          </button>
+          <button onclick="app.setFilter('active')" id="filterTab-active" class="filter-tab px-4 py-2 text-xs font-semibold rounded-xl transition text-slate-400 hover:text-white">
+            Active Pledges
+          </button>
+          <button onclick="app.setFilter('funded')" id="filterTab-funded" class="filter-tab px-4 py-2 text-xs font-semibold rounded-xl transition text-slate-400 hover:text-white">
+            Goal Reached
+          </button>
+          <button onclick="app.setFilter('backed')" id="filterTab-backed" class="filter-tab px-4 py-2 text-xs font-semibold rounded-xl transition text-slate-400 hover:text-white">
+            Backed by Me
+          </button>
+          <button onclick="app.setFilter('my-campaigns')" id="filterTab-my-campaigns" class="filter-tab px-4 py-2 text-xs font-semibold rounded-xl transition text-slate-400 hover:text-white">
+            My Campaigns
+          </button>
+        </div>
+
+        <!-- Search & Category Filter -->
+        <div class="flex items-center space-x-3">
+          <div class="relative flex-1 md:w-64">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="campaignSearchInput" placeholder="Search projects or topics..." 
+                   class="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-slate-900/90 border border-slate-800 focus:outline-none focus:border-brand-500 text-slate-200 placeholder-slate-500 transition">
+          </div>
+          <select id="categorySelect" class="px-3 py-2 text-xs rounded-xl bg-slate-900/90 border border-slate-800 focus:outline-none focus:border-brand-500 text-slate-300 transition">
+            <option value="all">All Categories</option>
+            <option value="STEM & Web3">STEM & Web3</option>
+            <option value="Virtual Reality">Virtual Reality</option>
+            <option value="Infrastructure">Infrastructure</option>
+            <option value="Research">Research</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Campaign Grid Container -->
+      <div id="campaignsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyCampaignsState" class="hidden text-center py-16 px-4 rounded-3xl border border-dashed border-slate-800 bg-slate-900/30">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-4">
+          <i data-lucide="layers" class="w-8 h-8"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white">No campaigns found</h3>
+        <p class="text-sm text-slate-400 max-w-sm mx-auto mt-1 mb-6">There are no campaigns matching your current filter or search criteria.</p>
+        <button onclick="app.setFilter('all')" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
+          Reset Filters
+        </button>
+      </div>
+    </section>
+
+    <!-- How It Works / Milestone Protocol Explainer -->
+    <section class="rounded-3xl p-8 border border-slate-800/80 bg-slate-900/40">
+      <div class="max-w-2xl">
+        <span class="text-xs font-bold text-brand-400 uppercase tracking-wider">Protocol Architecture</span>
+        <h2 class="text-2xl font-bold text-white mt-1">How Milestone-Based Funding Works</h2>
+        <p class="text-sm text-slate-400 mt-2">EduFund replaces blind trust with on-chain cryptographic accountability.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        <div class="p-6 rounded-2xl bg-surface-900/80 border border-slate-800 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center font-bold">1</div>
+          <h3 class="font-bold text-white text-base">Milestone Pledges</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">Creators lock clear verifiable phases with allocated amounts. Backers pledge ETH into the smart contract escrow.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-surface-900/80 border border-slate-800 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">2</div>
+          <h3 class="font-bold text-white text-base">Backer Consensus</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">When creator delivers a milestone, backers vote with their pledged weight. Upon reaching >50% consensus, the creator unlocks that tranche.</p>
+        </div>
+        <div class="p-6 rounded-2xl bg-surface-900/80 border border-slate-800 space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">3</div>
+          <h3 class="font-bold text-white text-base">100% Refund Guarantee</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">If a campaign fails to hit its overall funding goal before the deadline, contributors can instantly claim back 100% of their deposited ETH.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-surface-950 py-10 text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-2">
+        <span class="font-bold text-slate-300">EduFund dApp</span>
+        <span>• Ethereum Sepolia Testnet</span>
+        <span>• LocalStorage Sync</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <a href="https://sepolia.etherscan.io" target="_blank" class="hover:text-slate-300 transition">Sepolia Explorer</a>
+        <a href="https://ethereum.org" target="_blank" class="hover:text-slate-300 transition">Ethereum Docs</a>
+        <button onclick="app.resetDemoData()" class="hover:text-red-400 transition">Reset Demo Storage</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. LAUNCH CAMPAIGN MODAL -->
+  <div id="createCampaignModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+            <i data-lucide="rocket" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-white">Launch New Campaign</h3>
+            <p class="text-xs text-slate-400">Initialize a milestone-backed project on Ethereum</p>
+          </div>
+        </div>
+        <button onclick="app.closeCreateModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Form -->
+      <form id="createCampaignForm" class="space-y-5" onsubmit="app.handleCreateCampaign(event)">
+        
+        <!-- Title & Category -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="sm:col-span-2 space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Campaign Title *</label>
+            <input type="text" id="campTitle" required placeholder="e.g. Decentralized STEM Labs for Students"
+                   class="w-full px-4 py-2.5 rounded-xl bg-surface-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Category *</label>
+            <select id="campCategory" class="w-full px-4 py-2.5 rounded-xl bg-surface-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-brand-500">
+              <option value="STEM & Web3">STEM & Web3</option>
+              <option value="Virtual Reality">Virtual Reality</option>
+              <option value="Infrastructure">Infrastructure</option>
+              <option value="Research">Research</option>
+              <option value="Scholarship">Scholarship</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-300">Detailed Project Summary *</label>
+          <textarea id="campDescription" rows="3" required placeholder="Explain the project problem, impact, deliverables, and student benefit..."
+                    class="w-full px-4 py-2.5 rounded-xl bg-surface-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-brand-500"></textarea>
+        </div>
+
+        <!-- Image URL & Preset Selection -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-300">Banner Cover Image URL</label>
+            <span class="text-[11px] text-slate-400">or pick a sample:</span>
+          </div>
+          <input type="url" id="campImageURI" placeholder="https://images.unsplash.com/..."
+                 value="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80"
+                 class="w-full px-4 py-2 rounded-xl bg-surface-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-brand-500">
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button type="button" onclick="app.setSampleImage(1)" class="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Coding Lab</button>
+            <button type="button" onclick="app.setSampleImage(2)" class="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Robotics & AI</button>
+            <button type="button" onclick="app.setSampleImage(3)" class="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Quantum / ZK</button>
+            <button type="button" onclick="app.setSampleImage(4)" class="px-2.5 py-1 text-[11px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">Clean Energy</button>
+          </div>
+        </div>
+
+        <!-- Deadline -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Funding Deadline *</label>
+            <input type="datetime-local" id="campDeadline" required
+                   class="w-full px-4 py-2.5 rounded-xl bg-surface-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-slate-300">Calculated Goal</label>
+            <div class="px-4 py-2.5 rounded-xl bg-surface-900/60 border border-slate-800 text-sm font-mono text-brand-400 font-bold flex items-center justify-between">
+              <span id="calculatedGoalDisplay">0.00 ETH</span>
+              <span class="text-xs text-slate-500 font-normal">Sum of Milestones</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Milestone Builder -->
+        <div class="space-y-3 pt-2 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-sm font-bold text-white">Project Milestones Breakdown</h4>
+              <p class="text-xs text-slate-400">Creators can only withdraw each tranche after backers approve the deliverable.</p>
+            </div>
+            <button type="button" onclick="app.addMilestoneInput()" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-brand-500/20 text-brand-300 hover:bg-brand-500/30 text-xs font-semibold border border-brand-500/30 transition">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Phase</span>
+            </button>
+          </div>
+
+          <!-- Milestones Inputs Container -->
+          <div id="milestonesInputContainer" class="space-y-3">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800">
+          <button type="button" onclick="app.closeCreateModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitCampaignBtn" class="flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-semibold text-sm shadow-md shadow-brand-500/25 transition">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>Deploy Campaign</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. CAMPAIGN DETAILS & MILESTONES MODAL -->
+  <div id="campaignDetailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 max-h-[92vh] overflow-y-auto">
+      
+      <!-- Close button -->
+      <button onclick="app.closeDetailModal()" class="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition z-10">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div id="campaignDetailContent">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 3. PLEDGE FUNDS MODAL -->
+  <div id="pledgeModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center">
+            <i data-lucide="heart" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-white">Back Campaign</h3>
+            <p class="text-xs text-slate-400">Pledge ETH on Sepolia Testnet</p>
+          </div>
+        </div>
+        <button onclick="app.closePledgeModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Campaign Summary Badge -->
+        <div class="p-3.5 rounded-xl bg-surface-900 border border-slate-800 flex items-center space-x-3">
+          <img id="pledgeTargetImage" src="" alt="" class="w-12 h-12 rounded-lg object-cover">
+          <div class="overflow-hidden">
+            <h4 id="pledgeTargetTitle" class="text-xs font-bold text-white truncate">Campaign Title</h4>
+            <div class="text-[11px] text-slate-400 mt-0.5">Goal: <span id="pledgeTargetGoal" class="text-brand-300 font-mono font-semibold">0.0 ETH</span></div>
+          </div>
+        </div>
+
+        <!-- Amount Selection Chips -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-300">Select Amount (ETH)</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="app.setPledgeAmount(0.05)" class="pledge-chip py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-200 border border-slate-700 transition">0.05</button>
+            <button type="button" onclick="app.setPledgeAmount(0.1)" class="pledge-chip py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-200 border border-slate-700 transition">0.10</button>
+            <button type="button" onclick="app.setPledgeAmount(0.25)" class="pledge-chip py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-200 border border-slate-700 transition">0.25</button>
+            <button type="button" onclick="app.setPledgeAmount(0.5)" class="pledge-chip py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-200 border border-slate-700 transition">0.50</button>
+          </div>
+        </div>
+
+        <!-- Custom Input -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-300">Custom ETH Amount</label>
+          <div class="relative">
+            <input type="number" id="customPledgeInput" step="0.01" min="0.001" placeholder="0.10"
+                   class="w-full pl-4 pr-16 py-3 rounded-xl bg-surface-900 border border-slate-700 font-mono text-base text-white focus:outline-none focus:border-brand-500">
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-slate-400">ETH</span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+            <span>≈ $<span id="pledgeUsdEstimate">265.00</span> USD</span>
+            <span>Wallet: <span id="pledgeWalletBalance" class="text-slate-300 font-mono">0.00</span> ETH</span>
+          </div>
+        </div>
+
+        <!-- Guarantee Notice -->
+        <div class="p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-xs text-brand-300 space-y-1">
+          <div class="flex items-center space-x-1.5 font-bold">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+            <span>Smart Contract Escrow Protection</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Your pledge is locked in the smart contract. You retain milestone voting power and can reclaim a 100% refund if the campaign goal is not met by the deadline.
+          </p>
+        </div>
+
+        <!-- Confirm CTA -->
+        <button id="confirmPledgeBtn" onclick="app.executePledge()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-brand-600 via-purple-600 to-pink-500 hover:opacity-90 text-white font-bold text-sm shadow-xl shadow-brand-500/30 transition flex items-center justify-center space-x-2">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+          <span>Confirm Pledge</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. CONTRACT CONFIG & SETTINGS MODAL -->
+  <div id="configModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            <i data-lucide="cpu" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-white">Smart Contract Settings</h3>
+            <p class="text-xs text-slate-400">Configure Ethereum Sepolia deployment</p>
+          </div>
+        </div>
+        <button onclick="app.closeConfigModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        
+        <!-- Contract Address Config -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-300">Deployed Contract Address (Sepolia)</label>
+          <input type="text" id="configContractAddress" placeholder="0x..."
+                 class="w-full px-4 py-2.5 rounded-xl bg-surface-900 border border-slate-700 font-mono text-xs text-white focus:outline-none focus:border-brand-500">
+          <p class="text-[11px] text-slate-400">Deploy `contracts/EduFund.sol` via Remix or Hardhat, then paste the address here.</p>
+        </div>
+
+        <!-- Network Info Card -->
+        <div class="p-4 rounded-xl bg-surface-900/60 border border-slate-800 space-y-2 text-xs">
+          <div class="flex justify-between py-1 border-b border-slate-800/80">
+            <span class="text-slate-400">Target Network</span>
+            <span class="font-semibold text-white">Ethereum Sepolia Testnet</span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-800/80">
+            <span class="text-slate-400">Chain ID</span>
+            <span class="font-mono text-slate-300">11155111 (0xaa36a7)</span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-slate-800/80">
+            <span class="text-slate-400">Currency</span>
+            <span class="font-semibold text-brand-300">SepoliaETH (18 decimals)</span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span class="text-slate-400">Solidity Version</span>
+            <span class="font-mono text-slate-300">^0.8.20</span>
+          </div>
+        </div>
+
+        <!-- Sepolia Faucets -->
+        <div class="space-y-2">
+          <label class="text-xs font-semibold text-slate-300">Free Sepolia Testnet Faucets:</label>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <a href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia" target="_blank" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-between transition">
+              <span>Google Cloud Faucet</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
+            </a>
+            <a href="https://sepoliafaucet.com" target="_blank" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-between transition">
+              <span>Alchemy Faucet</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-400"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Mode Toggle / Simulation -->
+        <div class="p-4 rounded-xl bg-slate-800/50 border border-slate-700/80 flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-white">Simulated Web3 Demo Wallet</h4>
+            <p class="text-[11px] text-slate-400">Test all features without MetaMask or testnet ETH</p>
+          </div>
+          <button id="toggleSimulatedBtn" onclick="app.toggleSimulatedWallet()" class="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white transition">
+            Enable
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between pt-2">
+          <button onclick="app.resetDemoData()" class="text-xs text-red-400 hover:text-red-300 font-semibold underline">
+            Reset All Local Data
+          </button>
+          <button onclick="app.saveContractConfig()" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-xs font-bold text-white shadow-md transition">
+            Save Settings
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. METAMASK DETECTION & TROUBLESHOOTING MODAL -->
+  <div id="troubleshootModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-white">Connecting MetaMask</h3>
+            <p class="text-xs text-slate-400">Resolve browser extension detection</p>
+          </div>
+        </div>
+        <button onclick="app.closeTroubleshootModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-300">
+        
+        <!-- Fix 1: Local Server (Most Common Reason) -->
+        <div class="p-4 rounded-2xl bg-surface-900 border border-slate-800 space-y-2">
+          <div class="flex items-center space-x-2 text-white font-bold text-sm">
+            <span class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs">1</span>
+            <span>Recommended: Open via Local Server (HTTP)</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed">
+            Chrome and Brave disable all browser extensions on local <code class="bg-slate-800 px-1 py-0.5 rounded text-amber-300 font-mono">file://</code> paths for security. To let MetaMask connect, run the built-in server:
+          </p>
+          <div class="p-2.5 rounded-xl bg-slate-950 font-mono text-[11px] text-slate-300 flex items-center justify-between">
+            <span>node server.js</span>
+            <button onclick="navigator.clipboard.writeText('node server.js'); app.showToast('Copied', 'Command copied to clipboard', 'info');" class="text-brand-400 hover:text-brand-300 text-[10px] uppercase font-bold">Copy</button>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            Then open <a href="http://localhost:3000" class="text-brand-400 underline font-semibold">http://localhost:3000</a> in your browser.
+          </p>
+        </div>
+
+        <!-- Fix 2: Enable File URL Access in Chrome -->
+        <div class="p-4 rounded-2xl bg-surface-900 border border-slate-800 space-y-2">
+          <div class="flex items-center space-x-2 text-white font-bold text-sm">
+            <span class="w-6 h-6 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs">2</span>
+            <span>Or: Allow File Access in Extension Settings</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed">
+            If you want to keep viewing directly from your disk:
+          </p>
+          <ol class="list-decimal list-inside space-y-1 text-slate-400 text-[11px] pl-1">
+            <li>Open <code class="text-slate-200 font-mono">chrome://extensions</code> in your browser.</li>
+            <li>Click <strong>Details</strong> under MetaMask.</li>
+            <li>Toggle <strong>ON</strong> the switch for <strong>"Allow access to file URLs"</strong>.</li>
+            <li>Refresh this page.</li>
+          </ol>
+        </div>
+
+        <!-- Fix 3: Unlock MetaMask -->
+        <div class="p-4 rounded-2xl bg-surface-900 border border-slate-800 space-y-2">
+          <div class="flex items-center space-x-2 text-white font-bold text-sm">
+            <span class="w-6 h-6 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs">3</span>
+            <span>Unlock MetaMask & Reload</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed">
+            Click the MetaMask Fox icon in your browser toolbar, unlock it with your password, and reload the tab.
+          </p>
+        </div>
+
+        <!-- Quick Action Buttons -->
+        <div class="pt-2 flex flex-col sm:flex-row items-center gap-2">
+          <button onclick="app.retryConnectWallet()" class="w-full sm:flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-md transition">
+            Retry Connect
+          </button>
+          <button onclick="window.web3Handler.enableSimulatedWallet(); app.closeTroubleshootModal();" class="w-full sm:flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition">
+            Use Simulated Demo Mode
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none">
+    <!-- Injected dynamically -->
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/contractConfig.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/web3Handler.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
